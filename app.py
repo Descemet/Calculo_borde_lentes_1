@@ -1,12 +1,12 @@
 import streamlit as st
 import numpy as np
 import plotly.graph_objects as go
-from streamlit_plotly_events import plotly_events  # 👈 Import correcto
+from streamlit_plotly_events import plotly_events
 
 st.set_page_config(page_title="Calculadora de Lentes Interactiva", layout="centered", page_icon="👓")
 
 st.title("👓 Calculadora Interactiva de Lentes")
-st.markdown("Explora el perfil de la lente y haz clic para conocer el espesor local 📍")
+st.markdown("Explora el perfil de la lente y haz clic sobre el gráfico para conocer el espesor local 📍")
 
 # --- Entradas ---
 col1, col2 = st.columns(2)
@@ -25,7 +25,7 @@ if modo == "Usar radios":
 else:
     P = st.number_input("Graduación (dioptrías)", value=+2.00, step=0.25)
     if "Plano" in tipo:
-        R2 = 1e9
+        R2 = 1e9  # plano
         R1 = 1000 * (n - 1) / P
     else:
         R1 = 2000 * (n - 1) / P
@@ -39,6 +39,7 @@ st.metric("📏 Espesor de borde (mm)", f"{t_borde:.3f}")
 x = np.linspace(-D/2, D/2, 400)
 y = Tc + (x**2)/(2*R1) - (x**2)/(2*R2)
 
+# --- Crear figura Plotly ---
 fig = go.Figure()
 fig.add_trace(go.Scatter(
     x=x,
@@ -47,26 +48,33 @@ fig.add_trace(go.Scatter(
     name="Perfil de la lente",
     line=dict(color="royalblue", width=3)
 ))
+
+# Eje simétrico para una vista realista
 fig.update_layout(
     title="Perfil interactivo de la lente",
     xaxis_title="Ancho (mm)",
     yaxis_title="Espesor (mm)",
     hovermode="x unified",
-    height=500
+    height=500,
+    template="simple_white"
 )
 
-# --- Interacción con clic (versión funcional) ---
+# --- Mostrar el gráfico y capturar clics ---
 selected_points = plotly_events(
     fig,
     click_event=True,
     hover_event=False,
     select_event=False,
-    override_height=500
+    override_height=500,
+    key="lente_grafico"  # evita conflictos en reruns
 )
 
-if selected_points:
+# --- Mostrar resultado del clic ---
+if selected_points and len(selected_points) > 0:
     punto_x = selected_points[0]["x"]
     t_local = Tc + (punto_x**2)/(2*R1) - (punto_x**2)/(2*R2)
     st.success(f"📍 En x = {punto_x:.2f} mm → Espesor = {t_local:.3f} mm")
+else:
+    st.info("Haz clic sobre el gráfico para ver el espesor en ese punto.")
 
-st.caption("Haz clic (o toca) sobre el perfil para ver el espesor local. Compatible con móviles 📱")
+st.caption("Funciona también con toques táctiles en móvil 📱")
