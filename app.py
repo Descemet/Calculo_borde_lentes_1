@@ -5,8 +5,8 @@ from streamlit_plotly_events import plotly_events
 
 st.set_page_config(page_title="Calculadora Interactiva de Lentes", layout="centered", page_icon="👓")
 
-st.title("👓 Calculadora Interactiva de Lentes")
-st.markdown("Haz clic en el perfil para ver el espesor local en ese punto 📍")
+st.title("👓 Calculadora Interactiva de Lentes (ambas caras)")
+st.markdown("Visualiza la forma completa de la lente y haz clic para conocer el espesor local 📍")
 
 # --- Entradas ---
 col1, col2 = st.columns(2)
@@ -25,49 +25,56 @@ if modo == "Usar radios":
 else:
     P = st.number_input("Graduación (dioptrías)", value=+2.00, step=0.25)
     if "Plano" in tipo:
-        R2 = 1e6  # no infinito, para mantener forma visible
+        R2 = 1e6  # casi plano
         R1 = 1000 * (n - 1) / P
     else:
         R1 = 2000 * (n - 1) / P
         R2 = -R1
 
-# --- Cálculo del espesor de borde ---
-t_borde = Tc + (D**2 / 8.0) * (1.0 / R1 - 1.0 / R2)
+# --- Coordenadas ---
+x = np.linspace(-D/2, D/2, 400)
+
+# --- Superficies de la lente ---
+# Cara anterior (frontal)
+y1 = (x**2) / (2 * R1)
+# Cara posterior (trasera)
+y2 = Tc + (x**2) / (2 * R2)
+
+# Corrige valores si R2 es enorme (plano)
+if abs(R2) > 1e5:
+    y2 = np.full_like(x, Tc)
+
+# --- Espesor de borde ---
+t_borde = (y2 - y1)[0]
 st.metric("📏 Espesor de borde (mm)", f"{t_borde:.3f}")
 
-# --- Perfil de la lente ---
-x = np.linspace(-D/2, D/2, 400)
-y = Tc + (x**2)/(2*R1) - (x**2)/(2*R2)
-
-# Normalización del perfil (para asegurar que se vea)
-y_min, y_max = y.min(), y.max()
-if abs(y_max - y_min) < 0.001:
-    y = (y - y.min()) * 1000  # amplifica si el perfil es muy plano
-
-# --- Crear figura Plotly ---
+# --- Figura ---
 fig = go.Figure()
 
-# Relleno de la lente
+# Superficie rellena de la lente
 fig.add_trace(go.Scatter(
-    x=np.concatenate(([x[0]], x, [x[-1]])),
-    y=np.concatenate(([0], y, [0])),
+    x=np.concatenate((x, x[::-1])),
+    y=np.concatenate((y1, y2[::-1])),
     fill='toself',
     fillcolor='rgba(65,105,225,0.3)',
     line=dict(color='royalblue', width=2),
     name="Lente"
 ))
 
+fig.add_trace(go.Scatter(x=x, y=y1, mode='lines', line=dict(color='blue', width=2), name="Cara anterior"))
+fig.add_trace(go.Scatter(x=x, y=y2, mode='lines', line=dict(color='darkblue', width=2), name="Cara posterior"))
+
 fig.update_layout(
-    title="Perfil de la lente (vista lateral)",
+    title="Perfil completo de la lente (vista lateral)",
     xaxis_title="Ancho (mm)",
     yaxis_title="Espesor (mm)",
-    hovermode="x unified",
     height=500,
+    hovermode="x unified",
     template="simple_white",
     showlegend=False
 )
 
-# --- Mostrar el gráfico y capturar clics ---
+# --- Captura de clic ---
 selected_points = plotly_events(
     fig,
     click_event=True,
@@ -77,25 +84,31 @@ selected_points = plotly_events(
     key="grafico_lente"
 )
 
-# --- Mostrar resultado del clic ---
+# --- Mostrar resultado ---
 if selected_points and len(selected_points) > 0:
     punto_x = selected_points[0]["x"]
-    # cálculo del espesor local
-    t_local = Tc + (punto_x**2)/(2*R1) - (punto_x**2)/(2*R2)
 
-    # Añadimos marcador rojo en el punto clicado
+    # Espesor local (diferencia entre ambas caras)
+    y1_local = (punto_x**2) / (2 * R1)
+    y2_local = Tc + (punto_x**2) / (2 * R2)
+    if abs(R2) > 1e5:
+        y2_local = Tc
+    t_local = y2_local - y1_local
+
+    # Añade marcador en el punto clicado
     fig.add_trace(go.Scatter(
-        x=[punto_x],
-        y=[t_local],
-        mode="markers",
-        marker=dict(color="red", size=10),
+        x=[punto_x, punto_x],
+        y=[y1_local, y2_local],
+        mode="lines+markers",
+        line=dict(color="red", width=3, dash="dot"),
+        marker=dict(color="red", size=8),
         name="Punto clicado"
     ))
 
     st.plotly_chart(fig, use_container_width=True)
-    st.success(f"📍 En x = {punto_x:.2f} mm → Espesor = {t_local:.3f} mm")
+    st.success(f"📍 En x = {punto_x:.2f} mm → Espesor local = {t_local:.3f} mm")
 else:
     st.plotly_chart(fig, use_container_width=True)
-    st.info("Haz clic (o toca) sobre el perfil para ver el espesor en ese punto.")
+    st.info("Haz clic (o toca) sobre la lente para medir el espesor local.")
 
-st.caption("Visualización interactiva compatible con móvil 📱")
+st.caption("Versión 2D completa con ambas caras — compatible con móvil 📱")
