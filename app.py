@@ -52,4 +52,5 @@ t_borde = Tc + (r_ef**2) / (2 * R_ef) if P > 0 else Tc + (r_ef**2) / (2 * R_ef)
 st.subheader("📏 Resultados")
 st.write(f"**Tipo de lente:** {tipo}")
 st.write(f"**Descentrado del centro óptico:** {decentrado:.2f} mm")
-st.metric("Espesor máximo de borde (mm)"
+st.metric("Espesor máximo de borde (mm)")
+
